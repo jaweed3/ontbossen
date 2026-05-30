@@ -1,0 +1,248 @@
+import { useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import { generateQuestions } from "../lib/claude";
+import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
+import { Card, CardContent } from "../components/ui/Card";
+import { ClipboardList, ArrowLeft, Sparkles, Plus, Check } from "lucide-react";
+import type { GeneratedQuestion } from "../lib/claude";
+
+export function CreateTopic() {
+  const { id: classId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [topicName, setTopicName] = useState("");
+  const [description, setDescription] = useState("");
+  const [questions, setQuestions] = useState<GeneratedQuestion[]>([]);
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function handleGenerate() {
+    if (!topicName.trim()) return;
+    setGenerating(true);
+    const result = await generateQuestions(topicName, description);
+    setQuestions(result);
+    setGenerating(false);
+  }
+
+  function handleQuestionChange(
+    index: number,
+    field: keyof GeneratedQuestion,
+    value: string
+  ) {
+    const updated = [...questions];
+    updated[index] = { ...updated[index], [field]: value };
+    setQuestions(updated);
+  }
+
+  function handleOptionChange(
+    qIndex: number,
+    oIndex: number,
+    value: string
+  ) {
+    const updated = [...questions];
+    updated[qIndex].options[oIndex] = value;
+    setQuestions(updated);
+  }
+
+  function addQuestion() {
+    setQuestions([
+      ...questions,
+      {
+        question_text: "",
+        options: ["A. ", "B. ", "C. ", "D. "],
+        correct_answer: "",
+        concept_tag: "",
+      },
+    ]);
+  }
+
+  function removeQuestion(index: number) {
+    setQuestions(questions.filter((_, i) => i !== index));
+  }
+
+  async function handleSave() {
+    if (!classId || !topicName.trim() || questions.length === 0) return;
+    setSaving(true);
+
+    const { data: topic, error: topicError } = await supabase
+      .from("topics")
+      .insert({
+        class_id: classId,
+        name: topicName.trim(),
+        description,
+      })
+      .select()
+      .single();
+
+    if (topicError || !topic) {
+      alert("Gagal menyimpan topik");
+      setSaving(false);
+      return;
+    }
+
+    const { error: questionsError } = await supabase.from("questions").insert(
+      questions.map((q) => ({
+        topic_id: topic.id,
+        question_text: q.question_text,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        concept_tag: q.concept_tag,
+      }))
+    );
+
+    if (questionsError) {
+      alert("Gagal menyimpan soal");
+      setSaving(false);
+      return;
+    }
+
+    navigate(`/class/${classId}/topic/${topic.id}`);
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white border-b border-border">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-3">
+          <button
+            onClick={() => navigate(`/class/${classId}`)}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <ClipboardList className="h-6 w-6 text-primary" />
+          <span className="font-bold text-xl">Topik Baru</span>
+        </div>
+      </header>
+
+      <main className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+        <Card>
+          <CardContent className="space-y-4 pt-6">
+            <Input
+              id="topicName"
+              label="Nama Topik"
+              value={topicName}
+              onChange={(e) => setTopicName(e.target.value)}
+              placeholder="Contoh: Pecahan Campuran"
+            />
+            <Input
+              id="description"
+              label="Deskripsi (opsional)"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Kelas 5 SD - Semester 1"
+            />
+            <Button
+              onClick={handleGenerate}
+              loading={generating}
+              disabled={!topicName.trim()}
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              {generating ? "Menulis soal..." : "Generate 5 Soal dengan AI"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {questions.length > 0 && (
+          <>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">
+                Soal ({questions.length})
+              </h2>
+              <Button variant="outline" size="sm" onClick={addQuestion}>
+                <Plus className="h-4 w-4 mr-1" />
+                Tambah Soal
+              </Button>
+            </div>
+
+            {questions.map((q, qi) => (
+              <Card key={qi}>
+                <CardContent className="space-y-4 pt-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-4">
+                      <Input
+                        id={`q-${qi}`}
+                        label={`Soal ${qi + 1}`}
+                        value={q.question_text}
+                        onChange={(e) =>
+                          handleQuestionChange(
+                            qi,
+                            "question_text",
+                            e.target.value
+                          )
+                        }
+                      />
+
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-700">
+                          Pilihan Jawaban
+                        </p>
+                        {q.options.map((opt, oi) => (
+                          <Input
+                            key={oi}
+                            id={`q-${qi}-opt-${oi}`}
+                            value={opt}
+                            onChange={(e) =>
+                              handleOptionChange(qi, oi, e.target.value)
+                            }
+                            className="ml-4"
+                          />
+                        ))}
+                      </div>
+
+                      <Input
+                        id={`q-${qi}-correct`}
+                        label="Jawaban Benar"
+                        value={q.correct_answer}
+                        onChange={(e) =>
+                          handleQuestionChange(
+                            qi,
+                            "correct_answer",
+                            e.target.value
+                          )
+                        }
+                      />
+
+                      <Input
+                        id={`q-${qi}-tag`}
+                        label="Tag Konsep"
+                        value={q.concept_tag}
+                        onChange={(e) =>
+                          handleQuestionChange(
+                            qi,
+                            "concept_tag",
+                            e.target.value
+                          )
+                        }
+                        placeholder="Contoh: pecahan-campuran"
+                      />
+                    </div>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeQuestion(qi)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      Hapus
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+
+            <Button
+              onClick={handleSave}
+              loading={saving}
+              size="lg"
+              className="w-full"
+            >
+              <Check className="h-4 w-4 mr-2" />
+              Simpan Topik & Soal
+            </Button>
+          </>
+        )}
+      </main>
+    </div>
+  );
+}

@@ -94,6 +94,10 @@ export function StudentQuiz() {
   function nextQuestion() { if (currentQ < questions.length - 1) setCurrentQ(currentQ + 1); }
   function prevQuestion() { if (currentQ > 0) setCurrentQ(currentQ - 1); }
 
+  function sanitize(input: string): string {
+    return input.replace(/<[^>]*>/g, "").replace(/[<>]/g, "").trim();
+  }
+
   async function submitQuiz() {
     if (!classData || !selectedTopic) return;
     setSubmitting(true);
@@ -104,9 +108,12 @@ export function StudentQuiz() {
 
     if (!session) { alert("Gagal mengirim. Coba lagi."); setSubmitting(false); return; }
 
+    const safeName = sanitize(studentName);
+    if (!safeName) { alert("Nama tidak valid."); setSubmitting(false); return; }
+
     const { error: insertError } = await supabase.from("answers").insert(
       Object.entries(answers).map(([questionId, selected_answer]) => ({
-        question_id: questionId, session_id: session.id, student_name: studentName.trim(), selected_answer,
+        question_id: questionId, session_id: session.id, student_name: safeName, selected_answer,
       }))
     );
 

@@ -41,9 +41,9 @@ CREATE TABLE quiz_sessions (
 
 CREATE TABLE answers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  question_id UUID NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
   session_id UUID NOT NULL REFERENCES quiz_sessions(id) ON DELETE CASCADE,
-  student_name TEXT NOT NULL,
+  question_id UUID NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+  student_name TEXT NOT NULL CHECK (char_length(student_name) BETWEEN 1 AND 50),
   selected_answer TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -122,7 +122,9 @@ CREATE POLICY "quiz_sessions_select_own" ON quiz_sessions
     EXISTS (SELECT 1 FROM classes WHERE id = quiz_sessions.class_id AND teacher_id = auth.uid())
   );
 CREATE POLICY "quiz_sessions_insert" ON quiz_sessions
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM classes WHERE id = class_id)
+  );
 CREATE POLICY "quiz_sessions_select" ON quiz_sessions
   FOR SELECT USING (true);
 
@@ -136,4 +138,6 @@ CREATE POLICY "answers_select_own" ON answers
     )
   );
 CREATE POLICY "answers_insert" ON answers
-  FOR INSERT WITH CHECK (true);
+  FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM quiz_sessions WHERE id = session_id)
+  );

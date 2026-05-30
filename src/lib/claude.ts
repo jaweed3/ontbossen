@@ -1,3 +1,6 @@
+// ⚠️ WARNING: VITE_ prefix variables are exposed client-side.
+// Only use VITE_CLAUDE_API_KEY for local dev. In production, set
+// OPENROUTER_API_KEY in Vercel (no VITE_ prefix) — handled by api/generate.ts.
 const CLAUDE_KEY = import.meta.env.VITE_CLAUDE_API_KEY || "";
 
 export interface GeneratedQuestion {

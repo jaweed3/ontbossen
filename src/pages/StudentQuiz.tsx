@@ -52,6 +52,32 @@ export function StudentQuiz() {
     if (!studentName.trim()) { setNameError("Masukkan nama atau inisial"); return; }
     if (!selectedTopic || !classData) return;
 
+    const key = `submitted:${selectedTopic}:${studentName.trim().toLowerCase()}`;
+    const lastSubmit = localStorage.getItem(key);
+    if (lastSubmit) {
+      const elapsed = Date.now() - parseInt(lastSubmit);
+      if (elapsed < 300000) {
+        setError("Kamu sudah mengerjakan topik ini. Tunggu 5 menit untuk mengulang.");
+        return;
+      }
+    }
+
+    const { data: topicQuestions } = await supabase.from("questions").select("id").eq("topic_id", selectedTopic);
+    const questionIds = topicQuestions?.map(q => q.id) || [];
+    if (questionIds.length === 0) { setError("Belum ada soal untuk topik ini."); return; }
+
+    const { data: existing } = await supabase
+      .from("answers")
+      .select("id")
+      .eq("student_name", studentName.trim())
+      .in("question_id", questionIds)
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      setError("Kamu sudah pernah mengerjakan topik ini. Guru hanya melihat 1 submission pertama.");
+      return;
+    }
+
     const { data: questionsData } = await supabase.from("questions").select("*").eq("topic_id", selectedTopic);
     if (!questionsData || questionsData.length === 0) { setError("Belum ada soal untuk topik ini."); return; }
 
@@ -85,7 +111,11 @@ export function StudentQuiz() {
     );
 
     if (insertError) alert("Gagal mengirim. Coba lagi.");
-    else setDone(true);
+    else {
+      const key = `submitted:${selectedTopic}:${studentName.trim().toLowerCase()}`;
+      localStorage.setItem(key, String(Date.now()));
+      setDone(true);
+    }
     setSubmitting(false);
   }
 
@@ -152,6 +182,8 @@ export function StudentQuiz() {
                 <h2 className="text-xl font-semibold text-text-primary">{classData?.name}</h2>
                 <p className="text-xs text-text-tertiary mt-1 font-mono">Kode: {code}</p>
               </div>
+
+              {error && <div className="bg-severe/10 border border-severe/30 text-severe text-sm rounded-lg px-4 py-3 font-medium">{error}</div>}
 
               <Input id="name" label="Nama atau Inisial" value={studentName} onChange={(e) => { setStudentName(e.target.value); setNameError(""); }} error={nameError} placeholder="Contoh: Andi" />
 

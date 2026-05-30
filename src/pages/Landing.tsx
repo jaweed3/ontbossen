@@ -1,8 +1,19 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/Button";
+import { Input } from "../components/ui/Input";
 import { ClipboardList, Brain, Shield, BarChart3 } from "lucide-react";
 
 export function Landing() {
+  const navigate = useNavigate();
+  const [classCode, setClassCode] = useState("");
+
+  function handleStudentGo() {
+    if (classCode.trim()) {
+      navigate(`/q/${classCode.trim().toUpperCase()}`);
+    }
+  }
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-border bg-white">
@@ -42,6 +53,31 @@ export function Landing() {
                 Sudah punya akun
               </Button>
             </Link>
+          </div>
+        </section>
+
+        <section className="max-w-md mx-auto px-4 pb-4 -mt-4">
+          <div className="bg-white border-2 border-primary/20 rounded-xl p-6 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <Shield className="h-5 w-5 text-primary" />
+              <h2 className="font-semibold text-gray-900">Untuk Murid</h2>
+            </div>
+            <p className="text-sm text-gray-500 mb-3">
+              Masukkan kode kelas dari guru kamu
+            </p>
+            <div className="flex gap-2">
+              <Input
+                id="classCode"
+                value={classCode}
+                onChange={(e) => setClassCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === "Enter" && handleStudentGo()}
+                placeholder="Contoh: X7K3M9"
+                className="uppercase font-mono tracking-wider text-center"
+              />
+              <Button onClick={handleStudentGo} disabled={!classCode.trim()}>
+                Mulai
+              </Button>
+            </div>
           </div>
         </section>
 

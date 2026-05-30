@@ -1,5 +1,5 @@
-const CLAUDE_API_KEY = import.meta.env.VITE_CLAUDE_API_KEY || "";
-const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
+const OPENROUTER_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
+const CLAUDE_KEY = import.meta.env.VITE_CLAUDE_API_KEY || "";
 
 export interface GeneratedQuestion {
   question_text: string;
@@ -8,16 +8,9 @@ export interface GeneratedQuestion {
   concept_tag: string;
 }
 
-export async function generateQuestions(
-  topic: string,
-  description: string
-): Promise<GeneratedQuestion[]> {
-  if (!CLAUDE_API_KEY) {
-    return generateFallbackQuestions(topic);
-  }
-
-  const prompt = `Kamu adalah guru Indonesia yang membuat soal diagnostik. 
-Buat 5 soal pilihan ganda untuk topik "${topic}" (${description}).
+const PROMPT = (topic: string, desc: string) =>
+  `Kamu adalah guru Indonesia yang membuat soal diagnostik.
+Buat 5 soal pilihan ganda untuk topik "${topic}" (${desc}).
 
 Setiap soal harus:
 1. Mengukur pemahaman konsep spesifik
@@ -37,33 +30,69 @@ Format output JSON array (jangan tambahkan markdown atau teks lain):
 
 Buat soal yang bisa mengidentifikasi MISKONSEPSI siswa, bukan hanya benar/salah.`;
 
-  try {
-    const response = await fetch(CLAUDE_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": CLAUDE_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 2000,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
+function extractJSON(raw: string): GeneratedQuestion[] {
+  const cleaned = raw.replace(/```json|```/g, "").trim();
+  return JSON.parse(cleaned) as GeneratedQuestion[];
+}
 
-    if (!response.ok) {
-      throw new Error(`Claude API error: ${response.statusText}`);
+async function viaOpenRouter(topic: string, desc: string) {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENROUTER_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "openai/gpt-4o-mini",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: PROMPT(topic, desc) }],
+    }),
+  });
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}`);
+  const data = await res.json();
+  return extractJSON(data.choices[0].message.content);
+}
+
+async function viaClaudeDirect(topic: string, desc: string) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": CLAUDE_KEY,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2000,
+      messages: [{ role: "user", content: PROMPT(topic, desc) }],
+    }),
+  });
+  if (!res.ok) throw new Error(`Claude direct ${res.status}`);
+  const data = await res.json();
+  return extractJSON(data.content[0].text);
+}
+
+export async function generateQuestions(
+  topic: string,
+  description: string
+): Promise<GeneratedQuestion[]> {
+  if (OPENROUTER_KEY) {
+    try {
+      return await viaOpenRouter(topic, description);
+    } catch (err) {
+      console.error("OpenRouter failed:", err);
     }
-
-    const data = await response.json();
-    const content = data.content[0].text;
-    const json = JSON.parse(content.replace(/```json|```/g, "").trim());
-    return json as GeneratedQuestion[];
-  } catch (err) {
-    console.error("Claude API failed, using fallback questions:", err);
-    return generateFallbackQuestions(topic);
   }
+
+  if (CLAUDE_KEY) {
+    try {
+      return await viaClaudeDirect(topic, description);
+    } catch (err) {
+      console.error("Claude direct failed:", err);
+    }
+  }
+
+  return generateFallbackQuestions(topic);
 }
 
 function generateFallbackQuestions(topic: string): GeneratedQuestion[] {

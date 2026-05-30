@@ -15,14 +15,14 @@ export function generateClassCode(): string {
 }
 
 export function getAccuracyColor(accuracy: number): string {
-  if (accuracy >= 80) return "text-green-600 bg-green-50";
-  if (accuracy >= 60) return "text-yellow-600 bg-yellow-50";
-  return "text-red-600 bg-red-50";
+  if (accuracy >= 80) return "text-healthy";
+  if (accuracy >= 60) return "text-mild";
+  return "text-severe";
 }
 
 export function getHeatmapColor(accuracy: number): string {
-  if (accuracy >= 80) return "bg-green-500";
-  if (accuracy >= 60) return "bg-yellow-500";
-  if (accuracy >= 40) return "bg-orange-500";
-  return "bg-red-500";
+  if (accuracy >= 80) return "bg-healthy";
+  if (accuracy >= 60) return "bg-mild";
+  if (accuracy >= 40) return "bg-moderate";
+  return "bg-severe";
 }

@@ -6,13 +6,9 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setAuthed(!!data.session);
-    });
+    supabase.auth.getSession().then(({ data }) => setAuthed(!!data.session));
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setAuthed(!!session);
     });
 
@@ -21,13 +17,15 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (authed === null) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+      <div className="flex items-center justify-center min-h-screen bg-void">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-6 w-6 border-2 border-accent-blue border-t-transparent rounded-full animate-spin" />
+          <span className="label-uppercase">Memuat...</span>
+        </div>
       </div>
     );
   }
 
   if (!authed) return <Navigate to="/login" replace />;
-
   return <>{children}</>;
 }

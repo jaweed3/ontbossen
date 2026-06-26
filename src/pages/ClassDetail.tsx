@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "../components/ui/Button";
-import { Card, CardContent } from "../components/ui/Card";
+import { AdminLayout } from "../components/AdminLayout";
 import type { Class, Topic } from "../types";
-import { ClipboardList, ArrowLeft, Plus, BookOpen, ChevronRight, Copy, Check, BarChart3 } from "lucide-react";
+import {
+  Plus, BookOpen, Copy, Check, BarChart3,
+  Trash2, Users, FlaskConical
+} from "lucide-react";
 
 export function ClassDetail() {
   const { id } = useParams<{ id: string }>();
@@ -12,18 +15,25 @@ export function ClassDetail() {
   const [cls, setCls] = useState<Class | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [copied, setCopied] = useState(false);
+  const [studentCount, setStudentCount] = useState(0);
 
   useEffect(() => {
     if (!id) return;
 
     supabase.from("classes").select("*").eq("id", id).single().then(({ data }) => {
-      if (!data) navigate("/dashboard");
-      else setCls(data);
+      if (!data) { navigate("/dashboard"); return; }
+      setCls(data);
     });
 
     supabase.from("topics").select("*").eq("class_id", id).order("created_at", { ascending: false }).then(({ data }) => {
       if (data) setTopics(data);
     });
+
+    // ponytail: count distinct students from sessions
+    supabase.from("quiz_sessions").select("student_name").eq("class_id", id)
+      .then(({ data }) => {
+        if (data) setStudentCount(new Set(data.map(s => s.student_name)).size);
+      });
   }, [id, navigate]);
 
   async function deleteTopic(topicId: string) {
@@ -40,74 +50,103 @@ export function ClassDetail() {
   if (!cls) return null;
 
   return (
-    <div className="min-h-screen bg-void">
-      <header className="glass-panel border-b border-border-glass">
-        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center gap-3">
-          <button onClick={() => navigate("/dashboard")} className="text-text-tertiary hover:text-text-primary transition-colors">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div className="w-7 h-7 rounded bg-accent-blue/20 flex items-center justify-center">
-            <ClipboardList className="h-4 w-4 text-accent-blue" />
-          </div>
-          <span className="font-semibold text-base tracking-tight text-text-primary">{cls.name}</span>
-        </div>
-      </header>
+    <AdminLayout>
+      {/* Back + breadcrumb */}
+      <div className="flex items-center gap-2 text-[11px]/[16px] tracking-[0.08em] font-bold uppercase text-on-surface-variant mb-6">
+        <Link to="/dashboard" className="hover:text-on-surface transition-colors">Dashboard</Link>
+        <span className="text-xs">/</span>
+        <span className="text-primary">{cls.name}</span>
+      </div>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="glass-panel-strong rounded-xl p-6 mb-8 bg-gradient-to-br from-accent-blue/5 to-accent-cyan/5 border-accent-blue/10">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="label-uppercase block mb-1">Kode Kelas</span>
-              <p className="text-3xl font-mono font-bold tracking-[0.3em] text-text-primary">{cls.code}</p>
-              <p className="text-xs text-text-tertiary mt-2">Bagikan kode ini ke siswa. Mereka tidak perlu akun.</p>
+      {/* Class Header */}
+      <div className="glass-panel rounded-xl p-6 mb-8 relative overflow-hidden" style={{ boxShadow: "inset 0 1px 0 0 rgba(255, 255, 255, 0.05)" }}>
+        <div className="absolute -top-16 -right-16 w-48 h-48 bg-primary/5 blur-[80px] rounded-full" />
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="h-4 w-4 text-secondary" />
+              <span className="text-[11px]/[16px] tracking-[0.08em] font-bold uppercase text-secondary">
+                {studentCount} Siswa · {topics.length} Topik
+              </span>
             </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => copyClassCode(cls.code)}>
-                {copied ? <Check className="h-3.5 w-3.5 mr-1.5" /> : <Copy className="h-3.5 w-3.5 mr-1.5" />}
-                {copied ? "Tersalin" : "Salin"}
-              </Button>
-              <Link to={`/class/${id}/topics/new`}>
-                <Button><Plus className="h-4 w-4 mr-1.5" />Topik Baru</Button>
-              </Link>
+            <h2 className="text-[32px]/[40px] font-bold tracking-tight text-on-surface">{cls.name}</h2>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-[11px]/[16px] tracking-[0.08em] font-bold uppercase text-on-surface-variant">Kode Kelas:</span>
+              <span className="text-lg font-mono text-primary tracking-[0.3em] font-bold">{cls.code}</span>
+              <button
+                onClick={() => copyClassCode(cls.code)}
+                className="text-on-surface-variant hover:text-primary transition-colors ml-1"
+              >
+                {copied ? <Check className="h-4 w-4 text-healthy" /> : <Copy className="h-4 w-4" />}
+              </button>
             </div>
+            <p className="text-xs text-on-surface-variant/60 mt-1">Bagikan kode ini ke siswa. Mereka tidak perlu akun.</p>
           </div>
-        </div>
-
-        <h2 className="text-lg font-semibold text-text-primary mb-4">Daftar Topik</h2>
-
-        {topics.length === 0 ? (
-          <div className="text-center py-24">
-            <BookOpen className="h-10 w-10 text-text-tertiary mx-auto mb-4" />
-            <p className="text-base text-text-secondary">Belum ada topik</p>
-            <p className="text-sm text-text-tertiary mt-1">Buat topik pertama untuk mulai membuat soal diagnostik</p>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => copyClassCode(cls.code)} className="text-sm">
+              {copied ? <Check className="h-4 w-4 mr-1.5" /> : <Copy className="h-4 w-4 mr-1.5" />}
+              {copied ? "Tersalin" : "Salin Kode"}
+            </Button>
             <Link to={`/class/${id}/topics/new`}>
-              <Button className="mt-4"><Plus className="h-4 w-4 mr-1.5" />Buat Topik</Button>
+              <Button className="text-sm">
+                <Plus className="h-4 w-4 mr-1.5" />Topik Baru
+              </Button>
             </Link>
           </div>
-        ) : (
-          <div className="grid gap-2">
-            {topics.map((topic) => (
-              <Card key={topic.id}>
-                <CardContent className="flex items-center justify-between py-3">
-                  <div className="flex-1">
-                    <h3 className="font-medium text-text-primary">{topic.name}</h3>
-                    {topic.description && <p className="text-xs text-text-tertiary mt-0.5">{topic.description}</p>}
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Link to={`/class/${id}/topic/${topic.id}`}>
-                      <Button variant="outline" size="sm">
-                        <BarChart3 className="h-3.5 w-3.5 mr-1" />Hasil
-                      </Button>
-                    </Link>
-                    <Button variant="ghost" size="sm" onClick={() => deleteTopic(topic.id)} className="!text-severe hover:!bg-severe/10">Hapus</Button>
-                    <ChevronRight className="h-4 w-4 text-text-tertiary" />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
+        </div>
+      </div>
+
+      {/* Topics Section */}
+      <div className="flex items-center gap-4 mb-6">
+        <h3 className="text-[20px]/[28px] font-semibold text-on-surface">Daftar Topik</h3>
+        <div className="h-px flex-1 bg-white/5" />
+      </div>
+
+      {topics.length === 0 ? (
+        <div className="text-center py-24">
+          <BookOpen className="h-12 w-12 text-on-surface-variant/40 mx-auto mb-4" />
+          <p className="text-base text-on-surface-variant">Belum ada topik</p>
+          <p className="text-sm text-on-surface-variant/60 mt-1">Buat topik pertama untuk mulai membuat soal diagnostik</p>
+          <Link to={`/class/${id}/topics/new`}>
+            <Button className="mt-4"><Plus className="h-4 w-4 mr-1.5" />Buat Topik</Button>
+          </Link>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {topics.map((topic) => (
+            <div
+              key={topic.id}
+              className="glass-panel rounded-xl p-5 flex items-center justify-between group hover:bg-white/[0.06] transition-all"
+              style={{ boxShadow: "inset 0 1px 0 0 rgba(255, 255, 255, 0.05)" }}
+            >
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                  <FlaskConical className="h-5 w-5 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-on-surface truncate">{topic.name}</h3>
+                  {topic.description && (
+                    <p className="text-xs text-on-surface-variant/60 mt-0.5 truncate">{topic.description}</p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link to={`/class/${id}/topic/${topic.id}`}>
+                  <Button variant="outline" size="sm">
+                    <BarChart3 className="h-3.5 w-3.5 mr-1" />Hasil
+                  </Button>
+                </Link>
+                <button
+                  onClick={() => deleteTopic(topic.id)}
+                  className="p-2 rounded-lg text-on-surface-variant hover:text-error hover:bg-error/10 transition-all"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </AdminLayout>
   );
 }

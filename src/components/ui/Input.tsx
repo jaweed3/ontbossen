@@ -16,15 +16,15 @@ export function Input({ className, label, error, id, ...props }: InputProps) {
       <input
         id={id}
         className={cn(
-          "block w-full bg-surface-raised border border-border-glass rounded px-3 py-2.5 text-sm text-text-primary placeholder:text-text-tertiary",
-          "focus:outline-none focus:border-accent-blue focus:ring-1 focus:ring-accent-blue/30",
+          "block w-full bg-surface-container-lowest border border-white/10 rounded-lg px-3 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/30",
+          "focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30",
           "transition-all duration-150",
-          error && "border-severe focus:border-severe focus:ring-severe/30",
+          error && "border-error focus:border-error focus:ring-error/30",
           className
         )}
         {...props}
       />
-      {error && <p className="text-xs text-severe">{error}</p>}
+      {error && <p className="text-xs text-error">{error}</p>}
     </div>
   );
 }
